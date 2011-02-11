@@ -1,9 +1,14 @@
 (ns osc-scrape.util
+  (:refer-clojure :exclude [extend])
   (:require [osc-scrape.templates :as temp]
 	    [clojure.string :as str]
+	    [clojure.contrib.math :as math]
 	    [net.cgrand.enlive-html :as e])
-  (:use hiccup.core
+  (:use clojure.java.browse
+	hiccup.core
 	hiccup.page-helpers
+	clj-time.core
+	clj-time.format
 	evalive.core)
   (:gen-class))
 
@@ -51,6 +56,18 @@
     *site-title*
     (str/replace title (str " | " *site-title*) "")))
 
+(defn local-now [fmt]
+  (.toString (now) (->> "America/New_York"
+			time-zone-for-id
+			(with-zone fmt))))
+
+(defn pdf-page-percentage [outline scrape-urls]
+  (->> (/ (count outline) (count scrape-urls))
+       float
+       (* 100)
+       math/ceil
+       int))
+
 ;;; Functions on @outline
 (defn has-docs?
   "Verify whether or not an outline record has document links"
@@ -61,6 +78,23 @@
   (reduce + (for [[k v] outline] (count (:doc-links v)))))
 
 ;;; HTML generation
+
+(defn outline-summary-to-html [outline scrape-urls]
+  (html
+   [:p
+    [:ul
+     [:li (str "Generated on " (local-now (formatters :rfc822)))]
+     [:li
+      [:strong "Total PDF Documents: "]
+      (total-docs outline)]
+     [:li
+      [:strong "Total Number of Pages on Site: "]
+      (count scrape-urls)]
+     [:li
+      [:strong "Total Number of Pages with PDF's: "]
+      (str
+       (count outline)
+       " (" (pdf-page-percentage outline scrape-urls) "% of site)")]]]))
 
 (defn outline-detail-to-html
   "Create an HTML string representation of `outline`"
@@ -86,32 +120,27 @@
 	       "%20"
 	       " ")]])]]]])]))
 
-(defn outline-summary-to-html [outline]
-  (html
-   [:p
-    [:ul
-     [:li
-      [:strong "Total PDF Documents: "]
-      (total-docs outline)]
-     [:li
-      [:strong "Total Number of Pages with PDF's: "]
-      (count outline)]]]))
-
-(defn generate-summary [outline]
-  (temp/summary (e/html-snippet (outline-summary-to-html outline))))
+(defn generate-summary [outline scrape-urls]
+  (temp/summary (e/html-snippet (outline-summary-to-html outline scrape-urls))))
    
 (defn generate-detail [outline]
   (temp/detail (e/html-snippet (outline-detail-to-html outline))))
 
 (defn write-report
   "Generate final HTML report from outline data structure"
-  [outline]
-  (let [final-outline (->> @outline
+  [outline scrape-urls]
+  (let [final-outline (->> outline
 			   (filter has-docs?)
 			   (sort))
-	summary-nodes (generate-summary final-outline)
+	summary-nodes (generate-summary final-outline scrape-urls)
 	detail-nodes (generate-detail final-outline)
 	content-nodes (flatten (conj detail-nodes summary-nodes))
 	report-page (temp/page content-nodes)
 	output (apply str report-page)]
     (spit "outline.html" output)))
+
+(defn view-report
+  [outline scrape-urls]
+  (do
+    (write-report @outline @scrape-urls)
+    (browse-url "outline.html")))
