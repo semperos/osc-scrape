@@ -134,7 +134,7 @@
     (if (nil? (get-scrape-url @scrape-urls :to-read))
       (do
 	(println "Scrape complete! Check the outline atom for full results.")
-	(write-report outline))
+	(view-report outline scrape-urls))
       (recur outline scrape-urls))))
   
 (defn -main
