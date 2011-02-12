@@ -58,19 +58,24 @@
 
 (defn build-full-url
   "Remove URL fragments and make sure URL string is a fully-qualified URL string"
-  [url]
-  (let [url (remove-url-fragment url)]
+  [current-url url]
+  (let [base-path "http://www.oilspillcommission.gov/"
+	url (remove-url-fragment url)]
     (if-not (boolean (re-find #"^http://" url))
-      (if (= \/ (first url)) ; relative url starting with slash
-	(str (second (re-find #"(.*?)/$" *base-url*)) url) ; rm slash from base url
-	(str *base-url* url)) ; keep slash
-      url)))
+      (cond
+       (= \/ (first url)) (str (second (re-find #"(.*?)/$" base-path)) url)
+       (= \/ (last url)) (str current-url url)
+       :else (str current-url "/" url))
+      (if (= "http://www.oilspillcommission.gov" url)
+	base-path
+	url))))
 
 (defn prepare-pdf-entries
   "Prepare pdf links scraped from a page to be inserted into our outline data structure"
-  [link-nodes]
-  (->> (map #(update-in % [:attrs :href] build-full-url) link-nodes)
-	    (filter #(points-to-file? (get-in % [:attrs :href]) :pdf))))
+  [link-nodes current-url]
+  (let [build-url (partial build-full-url current-url)]
+    (->> (map #(update-in % [:attrs :href] build-url) link-nodes)
+	 (filter #(points-to-file? (get-in % [:attrs :href]) :pdf)))))
 
 (defn prepare-url-entries
   "Create a map by zipping up new URL's with a default map instance for inactive, unread URL entries"
@@ -98,7 +103,7 @@
   [outline current-url all-nodes]
   (let [link-nodes (select-internal-link-nodes all-nodes)
 	page-title (select-page-title all-nodes)	
-	pdf-links (prepare-pdf-entries link-nodes)]
+	pdf-links (prepare-pdf-entries link-nodes current-url)]
     (if (> (count pdf-links) 0)
       (do
 	(swap! outline
