@@ -9,3 +9,6 @@
 		     [evalive "1.0.0"]
 		     [swank-clojure "1.3.0-SNAPSHOT"]]
   :main osc-scrape.core)
+
+#_ :repositories {"stuartsierra-releases" "http://stuartsierra.com/maven2"}
+#_ [com.stuartsierra/lazytest "1.1.2"]
