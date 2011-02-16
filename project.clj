@@ -5,7 +5,8 @@
 		 [clj-time "0.3.0-SNAPSHOT"]
 		 [enlive "1.0.0-SNAPSHOT"]
 		 [hiccup "0.3.4"]]
-  :dev-dependencies [[marginalia "0.5.0-alpha"]
+  :dev-dependencies [[midje "1.1-alpha-1"]
+		     [marginalia "0.5.0-alpha"]
 		     [evalive "1.0.0"]
 		     [swank-clojure "1.3.0-SNAPSHOT"]]
   :main osc-scrape.core)
