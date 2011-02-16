@@ -2,7 +2,7 @@
   <dontWrapJar>false</dontWrapJar>
   <headerType>console</headerType>
   <jar>C:\Users\semperos\dev\clojure\osc-scrape\osc-scrape-1.0.0-SNAPSHOT-standalone.jar</jar>
-  <outfile>osc-pdf-scrape.exe</outfile>
+  <outfile>osc-file-scrape.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
   <chdir></chdir>
