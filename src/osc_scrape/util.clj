@@ -12,8 +12,6 @@
 	evalive.core)
   (:gen-class))
 
-(def *site-title* "National Commission on the BP Deepwater Horizon Oil Spill and Offshore Drilling")
-
 (defn has-extension
   "Function factory, creating boolean functions that verify if a string is a filename with an extension of `type`"
   [type]
@@ -47,14 +45,18 @@
   (str/replace url #"#.*$" ""))
 
 (defn get-final-path-arg
-  "Get the last part of a URL path"
+  "Get the last part of a URL path and strip %20 spaces"
   [path]
-  (second (re-find #"/([^/]*)$" path)))
+  (if-let [final-path (second (re-find #"/([^/]*)$" path))]
+    (str/replace final-path "%20" " ")
+    (str/replace path "%20" " ")))
+  
 
 (defn clean-title [title]
-  (if (= title (str *site-title* " | "))
-    *site-title*
-    (str/replace title (str " | " *site-title*) "")))
+  (let [site-title "National Commission on the BP Deepwater Horizon Oil Spill and Offshore Drilling"]
+    (if (= title (str site-title " | "))
+      site-title
+      (str/replace title (str " | " site-title) ""))))
 
 (defn local-now [fmt]
   (.toString (now) (->> "America/New_York"
@@ -67,6 +69,11 @@
        (* 100)
        math/ceil
        int))
+
+(defn group-by-extension
+  "Group a list of strings according to file extension"
+  [ss]
+  (group-by #(.toLowerCase (second (re-find #"\.(\w+)$" %))) ss))
 
 ;;; Functions on @outline
 (defn has-docs?
@@ -83,15 +90,17 @@
   (html
    [:p
     [:ul
-     [:li (str "Generated on " (local-now (formatters :rfc822)))]
      [:li
-      [:strong "Total PDF Documents: "]
+      [:strong "Date Generated: "]
+      (local-now (formatters :rfc822))]
+     [:li
+      [:strong "Total Documents: "]
       (total-docs outline)]
      [:li
       [:strong "Total Number of Pages on Site: "]
       (count scrape-urls)]
      [:li
-      [:strong "Total Number of Pages with PDF's: "]
+      [:strong "Total Number of Pages with Documents: "]
       (str
        (count outline)
        " (" (pdf-page-percentage outline scrape-urls) "% of site)")]]]))
@@ -102,23 +111,21 @@
   (html
    [:ul
     (for [[k v] outline]
-      [:li
-       [:strong "URL: "]
-       k
+      [:li [:strong "URL: "] k
        [:ul
-	[:li
-	 [:strong "Page Title: "]
-	 (clean-title (:page-title v))]
-	[:li
-	 [:strong (str "PDF Documents (" (count (:doc-links v)) "):")]
+	[:li [:strong "Page Title: "] (clean-title (:page-title v))]
+	[:li [:strong (str "Documents (" (count (:doc-links v)) "):")]
 	 [:ul
-	  (for [enlive-node (doall (:doc-links v))]
-	    [:li
-	     [:a {:href (get-in enlive-node [:attrs :href])}
-	      (str/replace
-	       (get-final-path-arg (get-in enlive-node [:attrs :href]))
-	       "%20"
-	       " ")]])]]]])]))
+	  (let [doc-nodes (doall (:doc-links v))
+		doc-urls (map #(get-in % [:attrs :href]) doc-nodes)
+		docs-by-group (sort (group-by-extension doc-urls))]
+	    (for [doc-type docs-by-group]
+	      [:li (str (-> (key doc-type) .toUpperCase)
+			" (" (count (val doc-type)) ")")
+	       (let [docs-as-links (map (fn [url] [:a {:href url}
+						   (get-final-path-arg url)])
+					(val doc-type))]
+		 (unordered-list docs-as-links))]))]]]])]))
 
 (defn generate-summary [outline scrape-urls]
   (temp/summary (e/html-snippet (outline-summary-to-html outline scrape-urls))))

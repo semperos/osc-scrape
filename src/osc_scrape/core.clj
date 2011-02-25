@@ -6,7 +6,7 @@
 ;; not be detected, as this is a link-based scrape.
 ;;
 ;; After the scrape is complete, a file `outline.html` is auto-generated which
-;; lists all PDF documents found on the site, grouped by web page. The web pages
+;; lists all documents found on the site, grouped by web page. The web pages
 ;; are ordered alphabetically by URL, to provide some sense of structure.
 ;;
 ;; If you run this utility from the REPL, you will also have the `outline` atom
@@ -40,10 +40,10 @@
 
 (defn select-internal-link-nodes
   "Return all nodes from the page that are links pointing to internal url's."
-  [node-or-nodes]
+  [base-path node-or-nodes]
   (e/select node-or-nodes [[:a (or
 				(e/attr-starts :href "/")
-				(e/attr-starts *base-url*))]]))
+				(e/attr-starts base-path))]]))
 
 (defn select-page-title
   "Retrieve the page's title from the `head` tag"
@@ -70,52 +70,53 @@
 	base-path
 	url))))
 
-(defn prepare-pdf-entries
-  "Prepare pdf links scraped from a page to be inserted into our outline data structure"
-  [link-nodes current-url]
+(defn filter-urls-to-visit
+  "Convert link nodes to just url strings, filter out urls that we won't/can't visit"
+  [current-url links]
+  (->> (map #(get-in % [:attrs :href]) links)
+       (remove points-to-file?)
+       (map remove-url-fragment)
+       (remove empty?)
+       (map build-full-url current-url)
+       distinct))
+
+(defn prepare-doc-entries
+  "Prepare doc links scraped from a page to be inserted into our outline data structure"
+  [current-url link-nodes]
   (let [build-url (partial build-full-url current-url)]
     (->> (map #(update-in % [:attrs :href] build-url) link-nodes)
-	 (filter #(points-to-file? (get-in % [:attrs :href]) :pdf)))))
+	 (filter #(points-to-file? (get-in % [:attrs :href]))))))
 
 (defn prepare-url-entries
   "Create a map by zipping up new URL's with a default map instance for inactive, unread URL entries"
   [v]
   (zipmap v (repeat {:status :inactive, :result :to-read})))
-			    
+
 (defn get-scrape-url
-  "Get a URL from the scrape-urls data structure. Result is either :to-read or :been-read"
+  "Get a URL from the scrape-urls data structure. The `result` param should either be :to-read or :been-read"
   [url-entries result]
   (first (for [[k v] url-entries :when (= (:result v) result)] k)))
 
-(defn filter-urls-to-visit
-  "Convert link nodes to just url strings, filter out urls that we won't/can't visit"
-  [links]
-  (->> (map #(get-in % [:attrs :href]) links)
-       (remove points-to-file?)
-       (map remove-url-fragment)
-       (remove empty?)
-       (map build-full-url)))
-
 ;; ## Functions that deal with state
 
-(defn add-pdfs-to-record!
-  "Add pdfs to record for particular URL"
+(defn add-docs-to-record!
+  "Add docs to record for particular URL"
   [outline current-url all-nodes]
-  (let [link-nodes (select-internal-link-nodes all-nodes)
-	page-title (select-page-title all-nodes)	
-	pdf-links (prepare-pdf-entries link-nodes current-url)]
-    (if (> (count pdf-links) 0)
+  (let [link-nodes (select-internal-link-nodes current-url all-nodes)
+	page-title (select-page-title all-nodes)
+	doc-links (prepare-doc-entries current-url link-nodes)]
+    (if (> (count doc-links) 0)
       (do
 	(swap! outline
 	       assoc-in [current-url :page-title] page-title)
 	(swap! outline
-	       assoc-in [current-url :doc-links] pdf-links))
+	       assoc-in [current-url :doc-links] doc-links))
       (println "No documents for this page."))))
 
 (defn update-scrape-urls!
   "Remove current url from to-visit and add new URL's"
   [scrape-urls current-url all-nodes]
-  (let [new-urls (filter-urls-to-visit (select-internal-link-nodes all-nodes))
+  (let [new-urls (filter-urls-to-visit current-url (select-internal-link-nodes current-url all-nodes))
 	new-urls-map (prepare-url-entries new-urls)]
     (swap! scrape-urls assoc-in [current-url] {:status :inactive, :result :been-read})
     (swap! scrape-urls #(merge %2 %1) new-urls-map)))
@@ -126,7 +127,7 @@
   (let [current-url (get-scrape-url @scrape-urls :to-read)
 	all-nodes (fetch-url current-url)]
     (println (str "Scraping page: " current-url))
-    (add-pdfs-to-record! outline current-url all-nodes)
+    (add-docs-to-record! outline current-url all-nodes)
     (update-scrape-urls! scrape-urls current-url all-nodes)))
 
 ;; ## Start the Scrape
@@ -141,7 +142,7 @@
 	(println "Scrape complete! Check the outline atom for full results.")
 	(view-report outline scrape-urls))
       (recur outline scrape-urls))))
-  
+
 (defn -main
   "Main function for AOT compilation"
   []
