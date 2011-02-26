@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [extend])
   (:require [osc-scrape.templates :as temp]
 	    [clojure.string :as str]
-	    [clojure.contrib.math :as math]
 	    [net.cgrand.enlive-html :as e])
   (:use clojure.java.browse
 	hiccup.core
@@ -44,13 +43,27 @@
   [url]
   (str/replace url #"#.*$" ""))
 
-(defn get-final-path-arg
+(defn unique-path
+  "Get non-base-url portion of a URL"
+  [url]
+  (->>
+   (-> #"^(http|https)://[^/]*(/.*?)$"
+              (re-find url)
+              (nth 2))
+   (drop 1)
+   (apply str)))
+
+(defn clean-path-for-fs
+  "Remove URL-y stuff that we don't want in a path name in a filesystem"
+  [path]
+  (str/replace path "%20" " "))
+
+(defn final-path
   "Get the last part of a URL path and strip %20 spaces"
   [path]
   (if-let [final-path (second (re-find #"/([^/]*)$" path))]
     (str/replace final-path "%20" " ")
     (str/replace path "%20" " ")))
-  
 
 (defn clean-title [title]
   (let [site-title "National Commission on the BP Deepwater Horizon Oil Spill and Offshore Drilling"]
@@ -63,11 +76,16 @@
 			time-zone-for-id
 			(with-zone fmt))))
 
+(defn log-time!
+  "Used to log time"
+  [outline stage]
+  (swap! outline assoc stage (local-now (formatters :rfc822))))
+
 (defn pdf-page-percentage [outline scrape-urls]
   (->> (/ (count outline) (count scrape-urls))
        float
        (* 100)
-       math/ceil
+       Math/ceil
        int))
 
 (defn group-by-extension
@@ -84,6 +102,11 @@
 (defn total-docs [outline]
   (reduce + (for [[k v] outline] (count (:doc-links v)))))
 
+(defn get-doc-urls [outline-entry]
+  (let [doc-nodes (doall (:doc-links outline-entry))]
+    (map #(get-in % [:attrs :href]) doc-nodes)))
+
+
 ;;; HTML generation
 
 (defn outline-summary-to-html [outline scrape-urls]
@@ -91,8 +114,11 @@
    [:p
     [:ul
      [:li
-      [:strong "Date Generated: "]
-      (local-now (formatters :rfc822))]
+      [:strong "Scrape Started: "]
+      (@outline :start)]
+     [:li
+      [:strong "Scrape Ended: "]
+      (@outline :end)]
      [:li
       [:strong "Total Documents: "]
       (total-docs outline)]
@@ -108,6 +134,9 @@
 (defn outline-detail-to-html
   "Create an HTML string representation of `outline`"
   [outline]
+  (do
+    (swap! outline dissoc :start)
+    (swap! outline dissoc :end))
   (html
    [:ul
     (for [[k v] outline]
@@ -116,20 +145,19 @@
 	[:li [:strong "Page Title: "] (clean-title (:page-title v))]
 	[:li [:strong (str "Documents (" (count (:doc-links v)) "):")]
 	 [:ul
-	  (let [doc-nodes (doall (:doc-links v))
-		doc-urls (map #(get-in % [:attrs :href]) doc-nodes)
+	  (let [doc-urls (get-doc-urls v)
 		docs-by-group (sort (group-by-extension doc-urls))]
 	    (for [doc-type docs-by-group]
 	      [:li (str (-> (key doc-type) .toUpperCase)
 			" (" (count (val doc-type)) ")")
 	       (let [docs-as-links (map (fn [url] [:a {:href url}
-						   (get-final-path-arg url)])
+						   (final-path url)])
 					(val doc-type))]
 		 (unordered-list docs-as-links))]))]]]])]))
 
 (defn generate-summary [outline scrape-urls]
   (temp/summary (e/html-snippet (outline-summary-to-html outline scrape-urls))))
-   
+
 (defn generate-detail [outline]
   (temp/detail (e/html-snippet (outline-detail-to-html outline))))
 
@@ -151,3 +179,25 @@
   (do
     (write-report @outline @scrape-urls)
     (browse-url "outline.html")))
+
+(defn fetch-url-data
+  "Fetch binary data at the given url"
+  [^String url out-file]
+  (let  [con    (-> url java.net.URL. .openConnection)
+         fields (reduce (fn [h v]
+                          (assoc h (.getKey v) (into [] (.getValue v))))
+                        {} (.getHeaderFields con))
+         size   (first (fields "Content-Length"))
+         in     (java.io.BufferedInputStream. (.getInputStream con))
+         out    (java.io.BufferedOutputStream.
+                 (java.io.FileOutputStream. out-file))
+         buffer (make-array Byte/TYPE 1024)]
+    (loop [g (.read in buffer)
+           r 0]
+      (if-not (= g -1)
+        (do
+          (.write out buffer 0 g)
+          (recur (.read in buffer) (+ r g)))))
+    (.close in)
+    (.close out)
+    (.disconnect con)))

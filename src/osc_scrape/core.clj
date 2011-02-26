@@ -14,8 +14,8 @@
 
 (ns osc-scrape.core
   (:require [net.cgrand.enlive-html :as e]
-	   [clojure.contrib.str-utils2 :as str])
-  (:use osc-scrape.util)
+	   [clojure.string :as str])
+  (:use [osc-scrape util file])
   (:gen-class :main true))
 
 ;; ## Global vars and program state
@@ -29,7 +29,7 @@
 
 (def *base-url* "http://www.oilspillcommission.gov/")
 (def scrape-urls (atom {*base-url* { :status :inactive, :result :to-read }}))
-(def outline (atom {}))
+(def outline (atom {:start nil, :end nil}))
 
 ;; ## Enlive-based functions
 
@@ -99,7 +99,7 @@
 
 ;; ## Functions that deal with state
 
-(defn add-docs-to-record!
+(defn add-files-to-record!
   "Add docs to record for particular URL"
   [outline current-url all-nodes]
   (let [link-nodes (select-internal-link-nodes current-url all-nodes)
@@ -121,13 +121,14 @@
     (swap! scrape-urls assoc-in [current-url] {:status :inactive, :result :been-read})
     (swap! scrape-urls #(merge %2 %1) new-urls-map)))
 
-(defn scrape-document-info!
+(defn scrape-file-info!
   "Scrape document info from current page defined in driver"
   [outline scrape-urls]
   (let [current-url (get-scrape-url @scrape-urls :to-read)
 	all-nodes (fetch-url current-url)]
     (println (str "Scraping page: " current-url))
-    (add-docs-to-record! outline current-url all-nodes)
+    (add-files-to-record! outline current-url all-nodes)
+    (download-files! outline current-url)
     (update-scrape-urls! scrape-urls current-url all-nodes)))
 
 ;; ## Start the Scrape
@@ -136,14 +137,16 @@
   "Start recursive scrape of entire website"
   [outline scrape-urls]
   (loop [outline outline scrape-urls scrape-urls]
-    (scrape-document-info! outline scrape-urls)
+    (scrape-file-info! outline scrape-urls)
     (if (nil? (get-scrape-url @scrape-urls :to-read))
       (do
 	(println "Scrape complete! Check the outline atom for full results.")
+        (log-time! outline :end)
 	(view-report outline scrape-urls))
       (recur outline scrape-urls))))
 
 (defn -main
   "Main function for AOT compilation"
   []
+  (log-time! outline :start)
   (start-scrape outline scrape-urls))
