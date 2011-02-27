@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [extend])
   (:require [osc-scrape.templates :as temp]
 	    [clojure.string :as str]
+            [clojure.contrib.duck-streams :as ds]
 	    [net.cgrand.enlive-html :as e])
   (:use clojure.java.browse
 	hiccup.core
@@ -76,10 +77,10 @@
 			time-zone-for-id
 			(with-zone fmt))))
 
-(defn log-time!
+(defn log!
   "Used to log time"
-  [outline stage]
-  (swap! outline assoc stage (local-now (formatters :rfc822))))
+  ([] (log! (str (local-now (formatters :rfc822)) "\n")))
+  ([s] (ds/append-spit "log.txt" (str s "\n"))))
 
 (defn pdf-page-percentage [outline scrape-urls]
   (->> (/ (count outline) (count scrape-urls))
@@ -114,11 +115,8 @@
    [:p
     [:ul
      [:li
-      [:strong "Scrape Started: "]
-      (@outline :start)]
-     [:li
-      [:strong "Scrape Ended: "]
-      (@outline :end)]
+      [:strong "Date Generated: "]
+      (local-now (formatters :rfc822))]
      [:li
       [:strong "Total Documents: "]
       (total-docs outline)]
@@ -134,9 +132,6 @@
 (defn outline-detail-to-html
   "Create an HTML string representation of `outline`"
   [outline]
-  (do
-    (swap! outline dissoc :start)
-    (swap! outline dissoc :end))
   (html
    [:ul
     (for [[k v] outline]

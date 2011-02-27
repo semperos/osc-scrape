@@ -29,7 +29,7 @@
 
 (def *base-url* "http://www.oilspillcommission.gov/")
 (def scrape-urls (atom {*base-url* { :status :inactive, :result :to-read }}))
-(def outline (atom {:start nil, :end nil}))
+(def outline (atom {}))
 
 ;; ## Enlive-based functions
 
@@ -123,30 +123,33 @@
 
 (defn scrape-file-info!
   "Scrape document info from current page defined in driver"
-  [outline scrape-urls]
+  [outline scrape-urls download-bool]
   (let [current-url (get-scrape-url @scrape-urls :to-read)
 	all-nodes (fetch-url current-url)]
     (println (str "Scraping page: " current-url))
-    (add-files-to-record! outline current-url all-nodes)
-    (download-files! outline current-url)
+    (if (= "true" (.toLowerCase download-bool))
+      (do
+        (add-files-to-record! outline current-url all-nodes)
+        (download-files! outline current-url))
+      (add-files-to-record! outline current-url all-nodes))
     (update-scrape-urls! scrape-urls current-url all-nodes)))
 
 ;; ## Start the Scrape
 
 (defn start-scrape
   "Start recursive scrape of entire website"
-  [outline scrape-urls]
-  (log-time! outline :start)
-  (loop [outline outline scrape-urls scrape-urls]
-    (scrape-file-info! outline scrape-urls)
+  [outline scrape-urls download-bool]
+  (log!)
+  (loop [outline outline scrape-urls scrape-urls download-bool download-bool]
+    (scrape-file-info! outline scrape-urls download-bool)
     (if (nil? (get-scrape-url @scrape-urls :to-read))
       (do
 	(println "Scrape complete! Check the outline atom for full results.")
-        (log-time! outline :end)
+        (log!)
 	(view-report outline scrape-urls))
-      (recur outline scrape-urls))))
+      (recur outline scrape-urls download-bool))))
 
 (defn -main
   "Main function for AOT compilation"
-  []
-  (start-scrape outline scrape-urls))
+  [download-bool]
+  (start-scrape outline scrape-urls download-bool))
