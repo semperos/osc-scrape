@@ -136,6 +136,7 @@
 (defn start-scrape
   "Start recursive scrape of entire website"
   [outline scrape-urls]
+  (log-time! outline :start)
   (loop [outline outline scrape-urls scrape-urls]
     (scrape-file-info! outline scrape-urls)
     (if (nil? (get-scrape-url @scrape-urls :to-read))
@@ -148,5 +149,4 @@
 (defn -main
   "Main function for AOT compilation"
   []
-  (log-time! outline :start)
   (start-scrape outline scrape-urls))

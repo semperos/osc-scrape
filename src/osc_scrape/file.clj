@@ -10,7 +10,7 @@
         base (nth (re-find #"^(http|https)://([^/]*)/" s) 2)
         path (str "/" (unique-path s))] ; unique-path excludes / after base
     (if (re-find #"%" path)
-      path ; it's already encoded
+      (str protocol "://" base path) ; it's already encoded
       (.toString (java.net.URI. protocol base path nil)))))
 
 (defn download-and-save-file
@@ -21,10 +21,10 @@
     (let [path (unique-path page-url)
           f (->> target-url
                  final-path
-                 (str path "/")
+                 (str "site-files" "/" path "/")
                  clean-path-for-fs
                  file)]
-      (mkdir-p path)
+      (mkdir-p (.getParent f))
       (if (exists? f)
         nil
         (do
