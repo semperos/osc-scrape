@@ -107,7 +107,6 @@
   (let [doc-nodes (doall (:doc-links outline-entry))]
     (map #(get-in % [:attrs :href]) doc-nodes)))
 
-
 ;;; HTML generation
 
 (defn outline-summary-to-html [outline scrape-urls]
@@ -173,7 +172,7 @@
   [outline scrape-urls]
   (do
     (write-report @outline @scrape-urls)
-    (browse-url "outline.html")))
+    (clojure.java.browse/browse-url "outline.html")))
 
 (defn fetch-url-data
   "Fetch binary data at the given url"

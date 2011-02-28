@@ -15,8 +15,7 @@
 (ns osc-scrape.core
   (:require [net.cgrand.enlive-html :as e]
 	   [clojure.string :as str])
-  (:use [osc-scrape util file])
-  (:gen-class :main true))
+  (:use [osc-scrape util file]))
 
 ;; ## Global vars and program state
 ;;
@@ -127,7 +126,7 @@
   (let [current-url (get-scrape-url @scrape-urls :to-read)
 	all-nodes (fetch-url current-url)]
     (println (str "Scraping page: " current-url))
-    (if (= "true" (.toLowerCase download-bool))
+    (if (= true download-bool)
       (do
         (add-files-to-record! outline current-url all-nodes)
         (download-files! outline current-url))
@@ -149,7 +148,11 @@
 	(view-report outline scrape-urls))
       (recur outline scrape-urls download-bool))))
 
-(defn -main
-  "Main function for AOT compilation"
-  [download-bool]
-  (start-scrape outline scrape-urls download-bool))
+(comment
+  
+  (defn -main
+    "Main function for AOT compilation"
+    [download-bool]
+    (start-scrape outline scrape-urls download-bool))
+
+  )
