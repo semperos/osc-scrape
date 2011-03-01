@@ -31,7 +31,9 @@
           (println (str "Saving file for " target-url))
           (try (fetch-url-data (url-encode target-url) f)
                (catch java.io.FileNotFoundException e
-                 (prn (str "File not found: " e)))))))))
+                 (log! (str "File not found: " e)))
+               (catch Exception e
+                 (log! (str "An exception occurred: " e)))))))))
 
 (defn download-files!
   "Run through all of the scraped document URL's for a given page and download and save the files."
