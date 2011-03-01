@@ -5,12 +5,20 @@
             [clojure.contrib.duck-streams :as ds]
 	    [net.cgrand.enlive-html :as e])
   (:use clojure.java.browse
+        [clojure.contrib.duck-streams :only [with-out-writer]]
 	hiccup.core
 	hiccup.page-helpers
 	clj-time.core
 	clj-time.format
 	evalive.core)
   (:gen-class))
+
+(defn serialize-data
+  "Print a data structure to a file so that we may read it in later."
+  [data-structure ^String filename]
+  (with-out-writer
+    (java.io.File. filename)
+    (binding [*print-dup* true] (prn data-structure))))
 
 (defn has-extension
   "Function factory, creating boolean functions that verify if a string is a filename with an extension of `type`"
@@ -172,6 +180,8 @@
   [outline scrape-urls]
   (do
     (write-report @outline @scrape-urls)
+    (serialize-data @outline "outline-data.txt")
+    (serialize-data @scrape-urls "scrape-urls-data.txt")
     (clojure.java.browse/browse-url "outline.html")))
 
 (defn fetch-url-data
