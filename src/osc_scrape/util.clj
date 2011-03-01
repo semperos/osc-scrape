@@ -177,12 +177,16 @@
     (spit "outline.html" output)))
 
 (defn view-report
-  [outline scrape-urls]
+  ([outline scrape-urls] (view-report outline scrape-urls false))
+  ([outline scrape-urls debug?]
   (do
     (write-report @outline @scrape-urls)
-;;    (serialize-data @outline "outline-data.txt")
-;;    (serialize-data @scrape-urls "scrape-urls-data.txt")
-    (clojure.java.browse/browse-url "outline.html")))
+    (if (true? debug?)
+      (do
+        (serialize-data @outline "outline-data.txt")
+        (serialize-data @scrape-urls "scrape-urls-data.txt"))
+      nil)
+    (clojure.java.browse/browse-url "outline.html"))))
 
 (defn fetch-url-data
   "Fetch binary data at the given url"
