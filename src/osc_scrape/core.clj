@@ -137,22 +137,15 @@
 
 (defn start-scrape
   "Start recursive scrape of entire website"
-  [outline scrape-urls download-bool]
+  [download-bool]
   (log!)
-  (loop [outline outline scrape-urls scrape-urls download-bool download-bool]
-    (scrape-file-info! outline scrape-urls download-bool)
-    (if (nil? (get-scrape-url @scrape-urls :to-read))
-      (do
-	(println "Scrape complete! Check the outline atom for full results.")
-        (log!)
-	(view-report outline scrape-urls))
-      (recur outline scrape-urls download-bool))))
-
-(comment
-  
-  (defn -main
-    "Main function for AOT compilation"
-    [download-bool]
-    (start-scrape outline scrape-urls download-bool))
-
-  )
+  (let [outline (atom {})
+        scrape-urls (atom {*base-url* { :status :inactive, :result :to-read }})]
+    (loop [outline outline scrape-urls scrape-urls download-bool download-bool]
+      (scrape-file-info! outline scrape-urls download-bool)
+      (if (nil? (get-scrape-url @scrape-urls :to-read))
+        (do
+          (println "Scrape complete!")
+          (log!)
+          (view-report outline scrape-urls))
+        (recur outline scrape-urls download-bool)))))
