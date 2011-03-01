@@ -180,8 +180,8 @@
   [outline scrape-urls]
   (do
     (write-report @outline @scrape-urls)
-    (serialize-data @outline "outline-data.txt")
-    (serialize-data @scrape-urls "scrape-urls-data.txt")
+;;    (serialize-data @outline "outline-data.txt")
+;;    (serialize-data @scrape-urls "scrape-urls-data.txt")
     (clojure.java.browse/browse-url "outline.html")))
 
 (defn fetch-url-data
