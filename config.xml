@@ -1,7 +1,7 @@
 <launch4jConfig>
   <dontWrapJar>false</dontWrapJar>
   <headerType>console</headerType>
-  <jar>C:\Users\semperos\dev\clojure\osc-scrape\osc-scrape-0.1.0-SNAPSHOT-standalone.jar</jar>
+  <jar>C:\Users\semperos\dev\clojure\osc-scrape\osc-scrape-0.2.0-SNAPSHOT-standalone.jar</jar>
   <outfile>osc-file-scrape.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
